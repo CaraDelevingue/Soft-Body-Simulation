@@ -14,7 +14,7 @@ class Example:
         self.frame_dt = 1.0/fps
 
         #每帧拆分为32子步
-        self.sim_substeps = 1
+        self.sim_substeps = 32
 
         #每个子步时间
         self.sim_dt = self.frame_dt / self.sim_substeps
@@ -41,6 +41,26 @@ class Example:
             #计算重力
             force = self.mass * self.gravity
 
+            #地面接触检测
+            if self.position[1] < 0.0:
+                penetration = -self.position[1]
+
+                #地面刚度
+                k = 10000.0
+                #阻尼系数
+                c = 50.0
+
+                #地面弹簧力
+                normal_force = k* penetration
+
+                #法向速度
+                v_normal = self.velocity[1]
+
+                #阻尼力
+                damping_force = -c * v_normal
+
+                force[1] += normal_force + damping_force    
+
             #牛顿第二定律
             acceleration = force / self.mass
 
@@ -58,6 +78,6 @@ class Example:
 if __name__ == "__main__":
     example = Example()
 
-    for i in range(10):
+    for i in range(1000):
         example.step()
-        print("frame", i,"position = ", example.position,"time = ", example.sim_time)
+        print("frame", i,"position = ", example.position)
