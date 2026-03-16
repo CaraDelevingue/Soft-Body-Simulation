@@ -22,51 +22,105 @@ class Example:
         #当前时间
         self.sim_time = 0.0
 
-        #粒子状态
-        #粒子质量
-        self.mass = 1.0
+        #----------
+        # 多粒子系统
+        #----------
 
-        #初始位置
-        self.position = np.array([0.0, 5.0, 0.0])
+        #粒子数量
+        self.num_particles = 3
+
+        #粒子质量
+        self.mass = np.ones(self.num_particles)
 
         #初始速度
-        self.velocity = np.array([0.0, 0.0, 0.0])
+        self.velocity = np.zeros((self.num_particles,3))
+
+        #初始位置
+        self.position = np.zeros((self.num_particles,3))
+        for i in range(self.num_particles):
+            self.position[i] = np.array([0.0, 5.0 + i, 0.0])
 
         #重力
         self.gravity =  np.array([0.0, -9.8, 0.0])
 
+        #----------
+        #弹簧连接
+        #----------
+        self.springs = []
+
+        #每个弹簧记录（i， j， rest_length）
+        for i in range(self.num_particles -1):
+            p_i = self.position[i]
+            p_j = self.position[i+1]
+
+            rest_length = np.linalg.norm(p_j - p_i)
+
+            self.springs.append((i, i + 1, rest_length))
+        
+        #结构力刚度
+        self.spring_k = 5000.0
+
+
     def simulate(self):
         for _ in range(self.sim_substeps):
 
-            #计算重力
-            force = self.mass * self.gravity
+            #----------
+            #弹簧力(基于当前position)
+            #----------
+            spring_forces = np.zeros((self.num_particles, 3))
 
-            #地面接触检测
-            if self.position[1] < 0.0:
-                penetration = -self.position[1]
+            for (i, j, rest_length) in self.springs:
+                x_i = self.position[i]
+                x_j = self.position[j]
 
-                #地面刚度
-                k = 10000.0
-                #阻尼系数
-                c = 50.0
+                delta = x_j - x_i
+                length = np.linalg.norm(delta)
 
-                #地面弹簧力
-                normal_force = k* penetration
+                if length == 0:
+                    continue
 
-                #法向速度
-                v_normal = self.velocity[1]
+                direction = delta / length
 
-                #阻尼力
-                damping_force = -c * v_normal
+                #Hooke 定律
+                force_magnitude = self.spring_k * (length - rest_length)
 
-                force[1] += normal_force + damping_force    
+                force = force_magnitude * direction
 
-            #牛顿第二定律
-            acceleration = force / self.mass
+                spring_forces[i] += force
+                spring_forces[j] -= force
 
-            #半隐式欧拉积分
-            self.velocity += acceleration * self.sim_dt
-            self.position += self.velocity * self.sim_dt
+            #对每个粒子计算
+            for i in range(self.num_particles):
+                #计算重力
+                force = self.mass[i] * self.gravity
+
+                #地面接触检测
+                if self.position[i, 1] < 0.0:
+                    penetration = -self.position[i, 1]
+
+                    #地面刚度
+                    k = 10000.0
+                    #阻尼系数
+                    c = 50.0
+
+                    #地面弹簧力
+                    normal_force = k* penetration
+
+                    #法向速度
+                    v_normal = self.velocity[i, 1]
+
+                    #阻尼力
+                    damping_force = -c * v_normal
+
+                    #计算合力
+                    force[1] += normal_force + damping_force    
+
+                #牛顿第二定律
+                acceleration = force / self.mass[i]
+
+                #半隐式欧拉积分
+                self.velocity[i] += acceleration * self.sim_dt
+                self.position[i] += self.velocity[i] * self.sim_dt
 
             #时间前进一个子步时间
             self.sim_time += self.sim_dt
@@ -78,6 +132,7 @@ class Example:
 if __name__ == "__main__":
     example = Example()
 
-    for i in range(1000):
+    for i in range(200):
         example.step()
-        print("frame", i,"position = ", example.position)
+        print("frame", i,"position = ")
+        print(example.position)
